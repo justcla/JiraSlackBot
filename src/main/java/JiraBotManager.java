@@ -17,11 +17,11 @@ public class JiraBotManager {
     }
 
     // Define a channel's project
-    public void doProject(String channelName, String jiraProject, boolean isRestricted, String slackUser)
+    public int registerProject(String channelName, String jiraProject, boolean isRestricted, String slackUser)
             throws UnauthorisedAccessError {
 
         // First try to get the channel info
-        ChannelInfo channelInfo = jbdm.getChannel(channelName);
+        ChannelInfo channelInfo = jbdm.getChannelByName(channelName);
 
         // Existing channel
         // If channel info exists, update the channel - if the user is a channel admin user, otherwise throw access error
@@ -33,6 +33,7 @@ public class JiraBotManager {
             }
             // Update the channel info
             jbdm.updateChannelDetails(channelInfo.channelId, jiraProject, isRestricted);
+            return channelInfo.channelId;
         }
         else
         // New channel
@@ -41,6 +42,7 @@ public class JiraBotManager {
             int channelId = jbdm.addChannel(channelName, jiraProject, isRestricted);
             // Since it's the first time channel creation, set the calling user as a channel admin
             jbdm.addChannelUser(channelId, slackUser, true);
+            return channelId;
         }
     }
 

@@ -1,6 +1,7 @@
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class JiraBotDataManager {
 
@@ -18,8 +19,12 @@ public class JiraBotDataManager {
         return instance;
     }
 
-    public ChannelInfo getChannel(String channelName) {
+    public ChannelInfo getChannelByName(String channelName) {
         return channels.stream().filter(c -> channelName.equals(c.channelName)).findFirst().orElse(null);
+    }
+
+    public ChannelInfo getChannelById(int channelId) {
+        return channels.stream().filter(c -> channelId == channelId).findFirst().orElse(null);
     }
 
     public boolean isExistingChannel(String channelName) {
@@ -82,5 +87,9 @@ public class JiraBotDataManager {
         user.slackName = slackUser;
         user.isAdmin = isAdmin;
         users.add(user);
+    }
+
+    public Set<ChannelUser> getChannelUsers(int channelId) {
+        return users.stream().filter(u -> u.channelId == channelId).collect(Collectors.toSet());
     }
 }
