@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public class TestJiraBotActions {
 
@@ -34,6 +35,8 @@ public class TestJiraBotActions {
             ChannelUser user = data.get();
             assertEquals("justin", user.slackName);
             assertEquals(true, user.isAdmin);
+        } else {
+            fail("Could not find a valid user");
         }
     }
 
