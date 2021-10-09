@@ -1,92 +1,86 @@
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
-import java.util.Optional;
-import java.util.Set;
-
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.*;
 
+@RunWith(MockitoJUnitRunner.class)
 public class TestJiraBotActions {
+
+    @Mock
+    JiraBotDataManager jbdmMock;
 
     @Test
     public void testFirstTimeCreateProjectCreatesOneAdminUser() throws JiraBotManager.UnauthorisedAccessError {
         // Prove: Test that running registerProject for the first time will create a single admin user
 
         // Test Setup
-        JiraBotManager jiraBotManager = JiraBotManager.getInstance();
-        JiraBotDataManager jbdm = JiraBotDataManager.getInstance();
+        JiraBotManager jiraBotManager = new JiraBotManager(jbdmMock);
+        // Test scenario: Channel does not previously exist
+        when(jbdmMock.getChannelByName(any())).thenReturn(null);
 
         // Test Execution
-        int channelId = jiraBotManager.registerProject("test-channel", "JFW",
+        int channelId = jiraBotManager.registerProject("test-channel", "JiraProj",
                 false, "justin");
 
-        // Test Verification
-        // Verify channel settings - Has correct Jira project and restricted settings
-        ChannelInfo channel = jbdm.getChannelById(channelId);
-        assertEquals("test-channel", channel.channelName);
-        assertEquals("JFW", channel.jiraProject);
-        assertEquals(false, channel.restricted);
-
-        // Verify channel users - exactly one user, with correct name and admin rights.
-        Set<ChannelUser> users = jbdm.getChannelUsers(channelId);
-        assertEquals(1, users.size());
-        Optional<ChannelUser> data = users.stream().findFirst();
-        if (data.isPresent()) {
-            ChannelUser user = data.get();
-            assertEquals("justin", user.slackName);
-            assertEquals(true, user.isAdmin);
-        } else {
-            fail("Could not find a valid user");
-        }
+        // Verify it called jbdm.createProject()
+        verify(jbdmMock).addChannel("test-channel", "JiraProj", false);
+        // Verify it called jbdm.addUser();
+        verify(jbdmMock).addChannelUser(channelId, "justin", true);
     }
 
     @Test
-    public void testRegisterProjectThrowsAccessErrorIfUserNotAdmin() {
+    public void testNonAdminUserCannotChangeProject() {
         // Test Setup
-        JiraBotManager jiraBotManager = JiraBotManager.getInstance();
-        JiraBotDataManager jbdm = JiraBotDataManager.getInstance();
+        JiraBotManager jiraBotManager = new JiraBotManager(jbdmMock);
+        // Test scenario: Channel was previously defined
+        when(jbdmMock.getChannelByName(any())).thenReturn(new ChannelInfo());
+        when(jbdmMock.isChannelAdmin(any(), anyInt())).thenReturn(false);
 
         // Test Execution
-        // Register project (first time)
         int channelId = 0;
         try {
-            channelId = jiraBotManager.registerProject("test-channel", "JFW", false, "justin");
-        } catch (JiraBotManager.UnauthorisedAccessError e) {
-            throw new RuntimeException("Unexpected error occurred. This is not the Error we are looking for.");
+            channelId = jiraBotManager.registerProject("test-channel", "JiraProj",
+                    false, "justin");
+            fail("Test should have failed by this point due to unauthorised access");
+        } catch (JiraBotManager.UnauthorisedAccessError unauthorisedAccessError) {
+            // This is expected! Test passed (Can check the error message - optional)
         }
 
-        // Register project (second time - different user)
-        // Check that it throws an UnauthorisedAccessError
-        try {
-            jiraBotManager.registerProject("test-channel", "JFW", false, "martha");
-        } catch (JiraBotManager.UnauthorisedAccessError e) {
-            // This is expected! We want the test to end up here.
-            assertEquals(JiraBotManager.UnauthorisedAccessError.class, e.getClass());
-        }
+        // Verification
+        verify(jbdmMock, times(1)).getChannelByName("test-channel");
+        verify(jbdmMock, times(1)).isChannelAdmin("justin", channelId);
+        // Verify it never calls jbdm.createProject()
+        verify(jbdmMock, never()).addChannel(any(), any(), anyBoolean());
+        // Verify it never calls jbdm.addUser();
+        verify(jbdmMock, never()).addChannelUser(anyInt(), any(), anyBoolean());
+        verifyNoMoreInteractions(jbdmMock);
     }
 
     @Test
-    public void testRegisterProjectAllowsUpdateWhenUserIsAdmin() throws JiraBotManager.UnauthorisedAccessError {
+    public void testAdminUserCanChangeProject() throws JiraBotManager.UnauthorisedAccessError {
         // Test Setup
-        JiraBotManager jiraBotManager = JiraBotManager.getInstance();
-        JiraBotDataManager jbdm = JiraBotDataManager.getInstance();
+        JiraBotManager jiraBotManager = new JiraBotManager(jbdmMock);
+        // Test scenario: Channel was previously defined
+        when(jbdmMock.getChannelByName(any())).thenReturn(new ChannelInfo());
+        when(jbdmMock.isChannelAdmin(any(), anyInt())).thenReturn(true);
 
         // Test Execution
-        // Register project (first time)
-        int channelId = jiraBotManager.registerProject("test-channel", "JFW", false, "justin");
-        // (Mini-verify)
-        ChannelInfo channelInfo = jbdm.getChannelById(channelId);
-        assertEquals("JFW", channelInfo.jiraProject);
-        assertEquals(false, channelInfo.restricted);
+        int channelId = jiraBotManager.registerProject("test-channel", "JiraProj",
+                false, "justin");
 
-        // Register project (second time - same user)
-        jiraBotManager.registerProject("test-channel", "PFW", true, "justin");
-
-        // Verify
-        // Check that channel info has now changed
-        channelInfo = jbdm.getChannelById(channelId);
-        assertEquals("PFW", channelInfo.jiraProject);
-        assertEquals(true, channelInfo.restricted);
-
+        // Verification
+        verify(jbdmMock, times(1)).getChannelByName("test-channel");
+        verify(jbdmMock, times(1)).isChannelAdmin("justin", channelId);
+        // Verify it calls jbdm.updateProject()
+        verify(jbdmMock, times(1)).updateChannelDetails(channelId, "JiraProj", false);
+        // Verify it never calls jbdm.addUser();
+        verify(jbdmMock, never()).addChannel(any(), any(), anyBoolean());
+        verify(jbdmMock, never()).addChannelUser(anyInt(), any(), anyBoolean());
+        verifyNoMoreInteractions(jbdmMock);
     }
+
 }
