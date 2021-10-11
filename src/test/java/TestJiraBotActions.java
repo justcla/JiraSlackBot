@@ -43,7 +43,7 @@ public class TestJiraBotActions {
         // Verify it called jbdm.createProject()
         verify(dataManagerMock).addChannel(channelName, jiraProject, isRestricted);
         // Verify it called jbdm.addUser();
-        verify(dataManagerMock).addChannelUser(channelId, callingUser, isRestricted);
+        verify(dataManagerMock).addChannelUser(channelId, callingUser, true);
     }
 
     @Test
@@ -255,6 +255,49 @@ public class TestJiraBotActions {
         verify(dataManagerMock, never()).addChannel(any(), any(), anyBoolean());
         verifyNoMoreInteractions(dataManagerMock);
     }
+
+    @Test
+    public void testAdminUserCanUpgradeBasicUserToAdmin() throws Throwable {
+        // Test Setup
+        int channelId = 1;
+        String testChannelName = "test-channel";
+        String callingUser = "calling-user";
+        String newUserName = "new-user";
+        // State: Channel is registered
+        ChannelInfo channelInfo = channelInfoObj(channelId, testChannelName);
+        when(dataManagerMock.getChannelByName(testChannelName)).thenReturn(channelInfo);
+        // State: Calling user IS a channel admin
+        when(dataManagerMock.isChannelAdmin(callingUser, channelId)).thenReturn(true);
+        // State: New user WAS previously added - as BASIC user
+        ChannelUser existingUser = new ChannelUser();
+        existingUser.isAdmin = false;   // <-- User starts as a BASIC user (not Admin)
+        when(dataManagerMock.getChannelUser(channelId, newUserName)).thenReturn(existingUser);
+
+        // Test Execution
+        // Upgrading to an ADMIN user
+        jiraBotActions.makeAdmin(testChannelName, callingUser, newUserName);
+
+        // What should it do?
+        // Check that it adds the user with ADMIN rights
+        verify(dataManagerMock, times(1)).addChannelUser(channelId, newUserName, true);
+    }
+
+    @Test
+    public void testAdminUserCanDowngradeAdminUserToBasic(){}
+
+    //-----------------------------------------------
+    // -- RemoveUser tests
+    //-----------------------------------------------
+
+    @Test
+    public void testCannotRemoveUserFromUnregisteredChannel_returnsUnregisteredChannelError(){}
+    @Test
+    public void testBasicUserCannotRemoveUser_returnsUnauthorisedAccessError(){}
+    @Test
+    public void testAdminUserCanRemoveBasicUser(){}
+    @Test
+    public void testAdminUserCanRemoveAdminUser(){}
+
 
     private ChannelInfo channelInfoObj(int channelId, String testChannelName) {
         ChannelInfo channelInfo = new ChannelInfo();

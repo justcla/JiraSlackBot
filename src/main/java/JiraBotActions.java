@@ -39,7 +39,7 @@ public class JiraBotActions {
         // Can only add users to a registered channel
         ChannelInfo channelInfo = dataManager.getChannelByName(channel);
         if (channelInfo == null) {
-            throw new UnregisteredChannelError("This channel has not been registered with the JiraBot. Please call 'project' to register the project before adding extra users.");
+            throw getUnregisteredChannelError();
         }
         // Only an admin can make changes to this channel
         if (!dataManager.isChannelAdmin(callingUser, channelInfo.channelId)) {
@@ -47,10 +47,56 @@ public class JiraBotActions {
         }
         // Can only add user if user is not already added
         if (dataManager.getChannelUser(channelInfo.channelId, newUser) != null) {
-            throw new InvalidActionError("Cannot add user. User is already registered for this channel.");
+            throw new InvalidActionError("User is already registered for this channel.");
         }
         // Channel is registered and the caller user is an admin for the channel. Proceed!
         dataManager.addChannelUser(channelInfo.channelId, newUser, makeAdmin);
+    }
+
+    public void makeAdmin(String channel, String callingUser, String channelUserName) throws UnauthorisedAccessError, UnregisteredChannelError, InvalidActionError {
+        // Can only change users in a registered channel
+        ChannelInfo channelInfo = dataManager.getChannelByName(channel);
+        if (channelInfo == null) {
+            throw getUnregisteredChannelError();
+        }
+        int channelId = channelInfo.channelId;
+        // Only an admin can make changes to this channel
+        if (!dataManager.isChannelAdmin(callingUser, channelId)) {
+            throw getUnauthorisedAccessError(callingUser);
+        }
+        // If adding an admin who is already an admin - InvalidAction
+        if (dataManager.isChannelAdmin(channelUserName, channelId)) {
+            throw new InvalidActionError("User is already an admin for this channel.");
+        }
+
+        // Proceed. Will add new, or upgrade existing user.
+        dataManager.addChannelUser(channelId, channelUserName, true);
+    }
+
+    public void removeAdmin(String channel, String callingUser, String channelUserName) throws UnauthorisedAccessError, UnregisteredChannelError, InvalidActionError {
+        // Can only change users in a registered channel
+        ChannelInfo channelInfo = dataManager.getChannelByName(channel);
+        if (channelInfo == null) {
+            throw getUnregisteredChannelError();
+        }
+        int channelId = channelInfo.channelId;
+        // Only an admin can make changes to this channel
+        if (!dataManager.isChannelAdmin(callingUser, channelId)) {
+            throw getUnauthorisedAccessError(callingUser);
+        }
+        // If attempting to removing admin access from basic user - InvalidAction
+        // Note: This returns the same whether the user is a Basic user, or just not registered
+        if (!dataManager.isChannelAdmin(channelUserName, channelId)) {
+            throw new InvalidActionError("User is not an admin for this channel.");
+        }
+
+        // Proceed. Will add new, or upgrade existing user.
+        dataManager.addChannelUser(channelId, channelUserName, true);
+    }
+
+    private UnregisteredChannelError getUnregisteredChannelError() {
+        return new UnregisteredChannelError("This channel has not been registered with the JiraBot. " +
+                "Please call 'project' to register the project first.");
     }
 
     private UnauthorisedAccessError getUnauthorisedAccessError(String slackUser) {
@@ -59,6 +105,7 @@ public class JiraBotActions {
     }
 
     public class UnauthorisedAccessError extends Throwable {
+
         public UnauthorisedAccessError(String message) {
             super(message);
         }

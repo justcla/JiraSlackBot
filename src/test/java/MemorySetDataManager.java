@@ -78,11 +78,17 @@ public class MemorySetDataManager implements JiraBotDataManager {
 
     @Override
     public void addChannelUser(int channelId, String slackUser, boolean isAdmin) {
-        ChannelUser user = new ChannelUser();
-        user.channelId = channelId;
-        user.slackName = slackUser;
+        // If user already exists - overwrite it with the updated values
+        // Get existing user, or create a new one
+        ChannelUser user = users.stream().filter(u -> u.channelId == channelId && slackUser.equals(u.slackName)).findFirst().orElse(null);
+        if (user == null) {
+            user = new ChannelUser();
+            user.channelId = channelId;
+            user.slackName = slackUser;
+            users.add(user);
+        }
+        // Now update relevant data
         user.isAdmin = isAdmin;
-        users.add(user);
     }
 
     @Override

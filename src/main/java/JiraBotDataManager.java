@@ -26,6 +26,9 @@ public interface JiraBotDataManager {
      */
     void updateChannelDetails(int channelId, String jiraProject, boolean isRestricted);
 
+    /**
+     * Adds or updates Channel User data. Key: channelId, slackUser
+     */
     void addChannelUser(int channelId, String slackUser, boolean isAdmin);
 
     Set<ChannelUser> getChannelUsers(int channelId);
