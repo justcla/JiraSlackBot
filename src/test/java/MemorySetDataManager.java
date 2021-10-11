@@ -19,12 +19,17 @@ public class MemorySetDataManager implements JiraBotDataManager {
 
     @Override
     public ChannelInfo getChannelById(int channelId) {
-        return channels.stream().filter(c -> channelId == channelId).findFirst().orElse(null);
+        return channels.stream().filter(c -> c.channelId == channelId).findFirst().orElse(null);
     }
 
     @Override
     public boolean isExistingChannel(String channelName) {
         return channels.stream().anyMatch(c -> c.channelName.equals(channelName));
+    }
+
+    @Override
+    public ChannelUser getChannelUser(int channelId, String slackUser) {
+        return users.stream().filter(u -> u.channelId == channelId && slackUser.equals(u.slackName)).findFirst().orElse(null);
     }
 
     @Override

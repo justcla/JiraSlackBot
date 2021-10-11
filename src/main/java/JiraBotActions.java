@@ -35,18 +35,22 @@ public class JiraBotActions {
         }
     }
 
-    public void addUser(String channel, String slackUser, boolean isAdmin) throws UnauthorisedAccessError, UnregisteredChannelError {
+    public void addUser(String channel, String callingUser, String newUser, boolean makeAdmin) throws UnauthorisedAccessError, UnregisteredChannelError, InvalidActionError {
         // Can only add users to a registered channel
-        ChannelInfo channelInfo = dataManager.getChannelByName("test-channel");
+        ChannelInfo channelInfo = dataManager.getChannelByName(channel);
         if (channelInfo == null) {
             throw new UnregisteredChannelError("This channel has not been registered with the JiraBot. Please call 'project' to register the project before adding extra users.");
         }
         // Only an admin can make changes to this channel
-        if (!dataManager.isChannelAdmin(slackUser, channelInfo.channelId)) {
-            throw getUnauthorisedAccessError(slackUser);
+        if (!dataManager.isChannelAdmin(callingUser, channelInfo.channelId)) {
+            throw getUnauthorisedAccessError(newUser);
+        }
+        // Can only add user if user is not already added
+        if (dataManager.getChannelUser(channelInfo.channelId, newUser) != null) {
+            throw new InvalidActionError("Cannot add user. User is already registered for this channel.");
         }
         // Channel is registered and the caller user is an admin for the channel. Proceed!
-        dataManager.addChannelUser(channelInfo.channelId, slackUser, isAdmin);
+        dataManager.addChannelUser(channelInfo.channelId, newUser, makeAdmin);
     }
 
     private UnauthorisedAccessError getUnauthorisedAccessError(String slackUser) {
@@ -62,6 +66,12 @@ public class JiraBotActions {
 
     public class UnregisteredChannelError extends Throwable {
         public UnregisteredChannelError(String message) {
+            super(message);
+        }
+    }
+
+    public class InvalidActionError extends Throwable {
+        public InvalidActionError(String message) {
             super(message);
         }
     }

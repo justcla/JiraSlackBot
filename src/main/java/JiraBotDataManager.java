@@ -29,4 +29,6 @@ public interface JiraBotDataManager {
     void addChannelUser(int channelId, String slackUser, boolean isAdmin);
 
     Set<ChannelUser> getChannelUsers(int channelId);
+
+    ChannelUser getChannelUser(int channelId, String slackUser);
 }

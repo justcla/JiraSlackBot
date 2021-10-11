@@ -44,7 +44,7 @@ public class TestJiraBotActions {
     }
 
     @Test
-    public void testNonAdminUserCannotChangeProject() {
+    public void testNonAdminUserCannotChangeProject_returnsUnauthorisedAccessError() {
         // Test Setup
         // Test scenario: Channel was previously defined
         when(dataManagerMock.getChannelByName(any())).thenReturn(new ChannelInfo());
@@ -56,7 +56,7 @@ public class TestJiraBotActions {
             channelId = jiraBotActions.registerProject("test-channel", "JiraProj",
                     false, "test-user");
             fail("Test should have failed by this point due to unauthorised access");
-        } catch (JiraBotActions.UnauthorisedAccessError unauthorisedAccessError) {
+        } catch (JiraBotActions.UnauthorisedAccessError e) {
             // This is expected! Test passed (Can check the error message - optional)
         }
 
@@ -97,18 +97,17 @@ public class TestJiraBotActions {
     //====================================================
 
     @Test
-    public void testCallingAddUserOnAnUnregisteredChannelWillReturnError() throws JiraBotActions.UnauthorisedAccessError {
+    public void testCannotAddUserOnAnUnregisteredChannel_returnsUnregisteredChannelError() throws Throwable {
         // Test Setup
         // Test scenario: Channel was previously defined. The caller is an admin user.
-        int channelId = 1;
         String testChannelName = "test-channel";
-        String testUserName = "test-user";
-        ChannelInfo channelInfo = channelInfoObj(channelId, testChannelName);
-        when(dataManagerMock.getChannelByName(any())).thenReturn(null);     // <-- Channel not registered
+        String callingUser = "calling-user";
+        String newUserName = "new-user";
+        when(dataManagerMock.getChannelByName(testChannelName)).thenReturn(null);     // <-- Channel not registered
 
         // Test Execution
         try {
-            jiraBotActions.addUser(testChannelName, testUserName, false);
+            jiraBotActions.addUser(testChannelName, callingUser, newUserName, false);
             fail("Test should have failed by this point due to unregistered channel");
         } catch (JiraBotActions.UnregisteredChannelError e) {
             // This is expected! Test passed (Can check the error message - optional)
@@ -126,19 +125,22 @@ public class TestJiraBotActions {
     }
 
     @Test
-    public void testNonAdminUserCanNotAddUser() throws JiraBotActions.UnregisteredChannelError {
+    public void testNonAdminUserCanNotAddUser_returnsUnauthorisedAccessError() throws Throwable {
         // Test Setup
         // Test scenario: Channel was previously defined. The caller is not an admin user.
         int channelId = 1;
         String testChannelName = "test-channel";
-        String testUserName = "test-user";
+        String callingUser = "calling-user";
+        String newUserName = "new-user";
+        // State: Channel is registered
         ChannelInfo channelInfo = channelInfoObj(channelId, testChannelName);
-        when(dataManagerMock.getChannelByName(any())).thenReturn(channelInfo);
-        when(dataManagerMock.isChannelAdmin(any(), anyInt())).thenReturn(false);
+        when(dataManagerMock.getChannelByName(testChannelName)).thenReturn(channelInfo);
+        // State: Calling user is NOT a channel admin
+        when(dataManagerMock.isChannelAdmin("calling-user", channelId)).thenReturn(false);
 
         // Test Execution
         try {
-            jiraBotActions.addUser(testChannelName, testUserName, true);
+            jiraBotActions.addUser(testChannelName, callingUser, newUserName, true);
             fail("Test should have failed by this point due to unauthorised access");
         } catch (JiraBotActions.UnauthorisedAccessError e) {
             // This is expected! Test passed (Can check the error message - optional)
@@ -147,32 +149,62 @@ public class TestJiraBotActions {
         // What should it do?
         // Check if the caller is an admin user.
         verify(dataManagerMock, times(1)).getChannelByName(testChannelName);
-        verify(dataManagerMock, times(1)).isChannelAdmin(testUserName, channelId);
+        verify(dataManagerMock, times(1)).isChannelAdmin(callingUser, channelId);
         // Verify it never calls jbdm.addUser();
         verify(dataManagerMock, never()).addChannelUser(anyInt(), any(), anyBoolean());
         verifyNoMoreInteractions(dataManagerMock);
     }
 
     @Test
-    public void testAdminUserCanAddUser() throws JiraBotActions.UnauthorisedAccessError, JiraBotActions.UnregisteredChannelError {
+    public void testCannotAddUserForExistingUser_returnsInvalidActionError() throws Throwable {
         // Test Setup
         // Test scenario: Channel was previously defined. The caller is an admin user.
         int channelId = 1;
         String testChannelName = "test-channel";
-        String testUserName = "test-user";
+        String callingUser = "calling-user";
+        String newUserName = "new-user";
         ChannelInfo channelInfo = channelInfoObj(channelId, testChannelName);
         when(dataManagerMock.getChannelByName(any())).thenReturn(channelInfo);
-        when(dataManagerMock.isChannelAdmin(any(), anyInt())).thenReturn(true);
+        when(dataManagerMock.isChannelAdmin(callingUser, channelId)).thenReturn(true);
+        // State: New user IS previously added
+        ChannelUser user = new ChannelUser();
+        when(dataManagerMock.getChannelUser(channelId, newUserName)).thenReturn(user);
+
+        // Expecting: Cannot add user; user already exists.
+        try {
+            jiraBotActions.addUser(testChannelName, callingUser, newUserName, false);
+            fail("Test should have failed by this point due to invalid action");
+        } catch (JiraBotActions.InvalidActionError e) {
+            // This is expected! Test passed (Can check the error message - optional)
+        }
+    }
+
+    @Test
+    public void testAdminUserCanAddUser() throws Throwable {
+        // Test Setup
+        // Test scenario: Channel was previously defined. The caller is an admin user.
+        int channelId = 1;
+        String testChannelName = "test-channel";
+        String callingUser = "calling-user";
+        String newUserName = "new-user";
+        // State: Channel is registered
+        ChannelInfo channelInfo = channelInfoObj(channelId, testChannelName);
+        when(dataManagerMock.getChannelByName(testChannelName)).thenReturn(channelInfo);
+        // State: Calling user IS a channel admin
+        when(dataManagerMock.isChannelAdmin(callingUser, channelId)).thenReturn(true);
+        // State: New user NOT previously added
+        when(dataManagerMock.getChannelUser(channelId, newUserName)).thenReturn(null);
 
         // Test Execution
-        jiraBotActions.addUser(testChannelName, testUserName, true);
+        jiraBotActions.addUser(testChannelName, callingUser, newUserName, true);
 
         // What should it do?
         // Check if the caller is an admin user.
         verify(dataManagerMock, times(1)).getChannelByName(testChannelName);
-        verify(dataManagerMock, times(1)).isChannelAdmin(testUserName, channelId);
+        verify(dataManagerMock, times(1)).getChannelUser(channelId, newUserName);
+        verify(dataManagerMock, times(1)).isChannelAdmin(callingUser, channelId);
         // Verify it calls jbdm to add the channel user - and verify values;
-        verify(dataManagerMock, times(1)).addChannelUser(channelId, testUserName, true);
+        verify(dataManagerMock, times(1)).addChannelUser(channelId, newUserName, true);
         // Verify it never calls addChannel;
         verify(dataManagerMock, never()).addChannel(any(), any(), anyBoolean());
         verifyNoMoreInteractions(dataManagerMock);
