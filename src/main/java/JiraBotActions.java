@@ -18,8 +18,7 @@ public class JiraBotActions {
         if (channelInfo != null) {
             // Abort if user is not authorised.
             if (!dataManager.isChannelAdmin(slackUser, channelInfo.channelId)) {
-                throw new UnauthorisedAccessError("Unauthorised access. Admin access required for this feature. " +
-                        "User '" + slackUser + "' is not an admin of this channel");
+                throw getUnauthorisedAccessError(slackUser);
             }
             // Update the channel info
             dataManager.updateChannelDetails(channelInfo.channelId, jiraProject, isRestricted);
@@ -36,8 +35,33 @@ public class JiraBotActions {
         }
     }
 
+    public void addUser(String channel, String slackUser, boolean isAdmin) throws UnauthorisedAccessError, UnregisteredChannelError {
+        // Can only add users to a registered channel
+        ChannelInfo channelInfo = dataManager.getChannelByName("test-channel");
+        if (channelInfo == null) {
+            throw new UnregisteredChannelError("This channel has not been registered with the JiraBot. Please call 'project' to register the project before adding extra users.");
+        }
+        // Only an admin can make changes to this channel
+        if (!dataManager.isChannelAdmin(slackUser, channelInfo.channelId)) {
+            throw getUnauthorisedAccessError(slackUser);
+        }
+        // Channel is registered and the caller user is an admin for the channel. Proceed!
+        dataManager.addChannelUser(channelInfo.channelId, slackUser, isAdmin);
+    }
+
+    private UnauthorisedAccessError getUnauthorisedAccessError(String slackUser) {
+        return new UnauthorisedAccessError("Unauthorised access. Admin access required for this feature. " +
+                "User '" + slackUser + "' is not an admin of this channel");
+    }
+
     public class UnauthorisedAccessError extends Throwable {
         public UnauthorisedAccessError(String message) {
+            super(message);
+        }
+    }
+
+    public class UnregisteredChannelError extends Throwable {
+        public UnregisteredChannelError(String message) {
             super(message);
         }
     }
