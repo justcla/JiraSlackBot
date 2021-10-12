@@ -285,6 +285,63 @@ public class TestJiraBotActions {
     @Test
     public void testAdminUserCanDowngradeAdminUserToBasic(){}
 
+    //=================================
+    // --- Make Admin
+    //=================================
+
+    @Test
+    public void testMakeAdminOnUnregProj_returnsUnregisteredProjectError() throws Throwable {
+        // Test Setup
+        String testChannelName = "test-channel";
+        String callingUser = "calling-user";
+        String newUserName = "new-user";
+        // State: Channel is NOT registered
+        when(dataManagerMock.getChannelByName(testChannelName)).thenReturn(null);
+
+        // Test Execution
+        // Upgrading to an ADMIN user
+        try {
+            jiraBotActions.makeAdmin(testChannelName, callingUser, newUserName);
+            fail("We should have had a test failure by now. Expecting UnregisteredChannelError.");
+        } catch (JiraBotActions.UnregisteredChannelError unregisteredChannelError) {
+            // This is what we are expecting!!
+        }
+
+        // Verify
+        verify(dataManagerMock, never()).isChannelAdmin(any(), anyInt());
+        verify(dataManagerMock, never()).addChannelUser(anyInt(), any(), anyBoolean());
+    }
+
+    @Test
+    public void testBasicUserCannotCallMakeAdmin_returnsUnauthorisedAccessError() throws Throwable {
+        // Test Setup
+        int channelId = 1;
+        String testChannelName = "test-channel";
+        String callingUser = "calling-user";
+        String newUserName = "new-user";
+        String jiraProject = "test-project";
+        // State: Channel is registered
+        ChannelInfo channelInfo = new ChannelInfo();
+        channelInfo.channelId = channelId;
+        channelInfo.channelName = testChannelName;
+        channelInfo.jiraProject = jiraProject;
+        when(dataManagerMock.getChannelByName(testChannelName)).thenReturn(channelInfo);
+        when(dataManagerMock.isChannelAdmin(callingUser, channelId)).thenReturn(false); // <- Not a channel admin
+
+        // Test Execution
+        // Upgrading to an ADMIN user
+        try {
+            jiraBotActions.makeAdmin(testChannelName, callingUser, newUserName);
+            fail("We should have had a test failure by now. Expecting UnregisteredChannelError.");
+        } catch (JiraBotActions.UnauthorisedAccessError e) {
+            // This is what we are expecting!!
+        }
+
+        // Verify
+        verify(dataManagerMock, times(1)).isChannelAdmin(callingUser, channelId);
+        verify(dataManagerMock, never()).addChannelUser(anyInt(), any(), anyBoolean());
+    }
+
     //-----------------------------------------------
     // -- RemoveUser tests
     //-----------------------------------------------
