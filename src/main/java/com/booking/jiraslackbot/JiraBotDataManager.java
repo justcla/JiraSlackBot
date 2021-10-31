@@ -1,3 +1,5 @@
+package com.booking.jiraslackbot;
+
 import java.util.Set;
 
 public interface JiraBotDataManager {

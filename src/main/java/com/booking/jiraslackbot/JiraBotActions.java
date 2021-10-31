@@ -1,3 +1,5 @@
+package com.booking.jiraslackbot;
+
 public class JiraBotActions {
 
     JiraBotDataManager dataManager;
