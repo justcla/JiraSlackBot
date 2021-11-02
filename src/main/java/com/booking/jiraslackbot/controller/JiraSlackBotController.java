@@ -6,10 +6,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-//
-// Slack App token: xapp-1-A02H428J36W-2693004651296-05892563c021ce1624e82237f78c682823fa8e0a04f18f370beeb6b6b5d20888
-//
-
 @RestController
 public class JiraSlackBotController {
 
